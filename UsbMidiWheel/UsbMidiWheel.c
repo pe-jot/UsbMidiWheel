@@ -9,7 +9,8 @@
 #define COUNTERCLOCKWISE 2
 const int8_t encoderStates[] = { 0, 1, 2, 0, 2, 0, 0, 1, 1, 0, 0, 2, 0, 2, 1, 0 };
 
-static volatile uint8_t cmdReadEncoder = 0;
+static volatile uint8_t cmdReadEncoder1 = 0;
+static volatile uint8_t cmdReadEncoder2 = 0;
 static volatile Command_type gCommand;
 
 
@@ -49,30 +50,64 @@ void MIDI_Task(void)
 		uint8_t MIDICommand = 0;
 		uint8_t MIDIPitch;
 		
-		if (gCommand.Enter != PUSHBUTTON_NONE)
+		if (gCommand.Encoder1_Button != PUSHBUTTON_NONE)
 		{
-			MIDICommand = (gCommand.Enter == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
+			MIDICommand = (gCommand.Encoder1_Button == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
 			MIDIPitch = 1;
-			gCommand.Enter = PUSHBUTTON_NONE;
+			gCommand.Encoder1_Button = PUSHBUTTON_NONE;
 		}
-		else if (gCommand.Rotation != ENCODER_NONE)
+		else if (gCommand.Encoder1_Rotation != ENCODER_NONE)
 		{
 			MIDICommand = MIDI_COMMAND_PROGRAM_CHANGE;
-			MIDIPitch = (gCommand.Rotation & 0x7F);
-			gCommand.Rotation = ENCODER_NONE;
+			MIDIPitch = (gCommand.Encoder1_Rotation & 0x7F);
+			gCommand.Encoder1_Rotation = ENCODER_NONE;
+		}
+		else if (gCommand.Encoder2_Button != PUSHBUTTON_NONE)
+		{
+			MIDICommand = (gCommand.Encoder2_Button == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
+			MIDIPitch = 2;
+			gCommand.Encoder2_Button = PUSHBUTTON_NONE;
+		}
+		else if (gCommand.Encoder2_Rotation != ENCODER_NONE)
+		{
+			MIDICommand = MIDI_COMMAND_PROGRAM_CHANGE;
+			MIDIPitch = (gCommand.Encoder2_Rotation & 0x7F);
+			gCommand.Encoder2_Rotation = ENCODER_NONE;
+		}
+		else if (gCommand.Button1 != PUSHBUTTON_NONE)
+		{
+			MIDICommand = (gCommand.Button1 == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
+			MIDIPitch = 11;
+			gCommand.Button1 = PUSHBUTTON_NONE;
+		}
+		else if (gCommand.Button2 != PUSHBUTTON_NONE)
+		{
+			MIDICommand = (gCommand.Button2 == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
+			MIDIPitch = 12;
+			gCommand.Button2 = PUSHBUTTON_NONE;
+		}
+		else if (gCommand.Button3 != PUSHBUTTON_NONE)
+		{
+			MIDICommand = (gCommand.Button3 == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
+			MIDIPitch = 13;
+			gCommand.Button3 = PUSHBUTTON_NONE;
+		}
+		else if (gCommand.Button4 != PUSHBUTTON_NONE)
+		{
+			MIDICommand = (gCommand.Button4 == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
+			MIDIPitch = 14;
+			gCommand.Button4 = PUSHBUTTON_NONE;
 		}
 
 		/* Check if a MIDI command is to be sent */
 		if (MIDICommand)
 		{
-			MIDI_EventPacket_t MIDIEvent = (MIDI_EventPacket_t)
-				{
-					.Event       = MIDI_EVENT(0, MIDICommand),
-
-					.Data1       = MIDICommand,
-					.Data2       = MIDIPitch,
-					.Data3       = MIDI_STANDARD_VELOCITY,
-				};
+			MIDI_EventPacket_t MIDIEvent = (MIDI_EventPacket_t) {
+				.Event       = MIDI_EVENT(0, MIDICommand),
+				.Data1       = MIDICommand,
+				.Data2       = MIDIPitch,
+				.Data3       = MIDI_STANDARD_VELOCITY,
+			};
 
 			/* Write the MIDI event packet to the endpoint */
 			Endpoint_Write_Stream_LE(&MIDIEvent, sizeof(MIDIEvent), NULL);
@@ -106,7 +141,36 @@ void MIDI_Task(void)
 
 ISR(INT0_vect)
 {
-	cmdReadEncoder = 1;
+	cmdReadEncoder2 = 1;
+}
+
+
+ISR(INT3_vect)
+{
+	cmdReadEncoder1 = 1;
+}
+
+
+inline static void ReadDebounced(volatile uint8_t* history, volatile PushbuttonState* action, uint8_t inputState)
+{
+	/* Button debouncing - based on:
+	 * Elliot Williams - Debounce Your Noisy Buttons, Part II - http://hackaday.com/2015/12/10/embed-with-elliot-debounce-your-noisy-buttons-part-ii/
+	 */
+	
+	*history <<= 1;
+	*history |= inputState;
+	if ((*history & 0b11000111) == 0b00000111)
+	{
+		/* Button pressed... */
+		*action = PUSHBUTTON_PRESSED;
+		*history = 0b11111111;
+	}
+	else if ((*history & 0b11100011) == 0b11100000)
+	{
+		/* Button released... */
+		*action = PUSHBUTTON_RELEASED;
+		*history = 0b00000000;
+	}	
 }
 
 
@@ -114,26 +178,20 @@ ISR(TIMER1_OVF_vect) // 10ms Timer
 {
 	TCNT1 = TIMER_PRELOAD_10MS;
 	uint8_t tempSREG = SREG;
-	static uint8_t encoderButtonHistory = 0;
 	
-	/* Button debouncing - based on:
-	 * Elliot Williams - Debounce Your Noisy Buttons, Part II - http://hackaday.com/2015/12/10/embed-with-elliot-debounce-your-noisy-buttons-part-ii/
-	 */
-	encoderButtonHistory <<= 1;
-	encoderButtonHistory |= ENCODER_SW_PIN_PRESSED;
+	static uint8_t encoder1ButtonHistory = 0;
+	static uint8_t encoder2ButtonHistory = 0;
+	static uint8_t button1History = 0;
+	static uint8_t button2History = 0;
+	static uint8_t button3History = 0;
+	static uint8_t button4History = 0;
 	
-	if ((encoderButtonHistory & 0b11000111) == 0b00000111)
-	{
-		/* Encoder button pressed... */
-		gCommand.Enter = PUSHBUTTON_PRESSED;
-		encoderButtonHistory = 0b11111111;
-	}
-	else if ((encoderButtonHistory & 0b11100011) == 0b11100000)
-	{
-		/* Encoder button released... */
-		gCommand.Enter = PUSHBUTTON_RELEASED;
-		encoderButtonHistory = 0b00000000;
-	}
+	ReadDebounced(&encoder1ButtonHistory, &(gCommand.Encoder1_Button), ENCODER1_SW_PIN_PRESSED);
+	ReadDebounced(&encoder2ButtonHistory, &(gCommand.Encoder2_Button), ENCODER2_SW_PIN_PRESSED);
+	ReadDebounced(&button1History, &(gCommand.Button1), BUTTON1_PRESSED);
+	ReadDebounced(&button2History, &(gCommand.Button2), BUTTON2_PRESSED);
+	ReadDebounced(&button3History, &(gCommand.Button3), BUTTON3_PRESSED);
+	ReadDebounced(&button4History, &(gCommand.Button4), BUTTON4_PRESSED);
 	
 	SREG = tempSREG;
 }
@@ -145,22 +203,25 @@ ISR(TIMER1_OVF_vect) // 10ms Timer
 
 int main(void)
 {
-	uint8_t encoderValue = 0;
-	uint8_t encoderCount = 0;
-	uint8_t encoderDirection = 0;
+	uint8_t encoder1Value = 0;
+	uint8_t encoder1Count = 0;
+	uint8_t encoder1Direction = 0;
+	uint8_t encoder2Value = 0;
+	uint8_t encoder2Count = 0;
+	uint8_t encoder2Direction = 0;
 	
 	memset((void*)&gCommand, 0, sizeof(Command_type));
 	
 	/* Configure I/O Ports */
-    DDRB |= (1<<0); /* PB0 = RXLED */
-    PORTB = (1<<1) | (1<<2) | (1<<3) | (1<<4) | (1<<5);
+    DDRB |= (1<<0) | (1<<5); /* PB0 = RXLED, PB5 = Button GND */
+    PORTB = (1<<1) | (1<<2) | (1<<3) | (1<<4);
     DDRC |= (1<<7); /* PC7 = USER_LED */
     PORTC = (1<<0) | (1<<1) | (1<<2) | (1<<3) | (1<<4) | (1<<5) | (1<<6);
     DDRD |= (1<<5); /* PD5 = TXLED */
-    PORTD = (1<<1) | (1<<2) | (1<<3) | (1<<4) | (1<<6) | (1<<7);
+    PORTD = (1<<0) | (1<<1) | (1<<2) | (1<<3) | (1<<4) | (1<<6) | (1<<7);
 	
 	/* Start Bootloader if µC is started via reset button */
-	if (MCUSR & (1 << EXTRF) || (ENCODER_SW_PIN_PRESSED))
+	if (MCUSR & (1 << EXTRF))
 	{
 		USER_LED_ON;
 		/*
@@ -174,9 +235,9 @@ int main(void)
 	MCUSR &= ~(1 << WDRF);
 	wdt_disable();
 	
-	/* INT0 on any edge for encoder reading - Encoder_A creates an interrupt (B is being polled) */
-	EICRA = (1 << ISC00);
-	EIMSK = (1 << INT0);
+	/* INT0+INT3 on any edge for encoder reading - Encoder_A creates an interrupt (B is being polled) */
+	EICRA = (1 << ISC30) | (1 << ISC00);
+	EIMSK = (1 << INT3) | (1 << INT0);
 	
 	/* Timer1 at fosc/64 */
 	TCNT1 = TIMER_PRELOAD_10MS;
@@ -191,40 +252,76 @@ int main(void)
 	
     while(1)
     {
-		if (cmdReadEncoder)
+		if (cmdReadEncoder1)
 		{
 			// Get 2 new encoder bits
-			encoderValue |= (ENCODER_B_VALUE | ENCODER_A_VALUE);
-			encoderDirection = encoderStates[(encoderValue) & 0xF];
+			encoder1Value |= (ENCODER1_B_VALUE | ENCODER1_A_VALUE);
+			encoder1Direction = encoderStates[(encoder1Value) & 0xF];
 					
-			if (encoderDirection == CLOCKWISE)
+			if (encoder1Direction == CLOCKWISE)
 			{
-				encoderCount++;
+				encoder1Count++;
 			}
-			else if (encoderDirection == COUNTERCLOCKWISE)
+			else if (encoder1Direction == COUNTERCLOCKWISE)
 			{
-				encoderCount--;
+				encoder1Count--;
 			}
 					
-			if ((encoderValue & 3) == 3)
+			if ((encoder1Value & 3) == 3)
 			{
 				/* Stretch valid limits for debouncing reasons */
-				if ((encoderCount >= 0x01) && (encoderCount < 0x70))
+				if ((encoder1Count >= 0x01) && (encoder1Count < 0x70))
 				{
 					/* Clockwise turn... */
-					gCommand.Rotation = 1;
+					gCommand.Encoder1_Rotation = 1;
 				}
-				else if ((encoderCount <= 0xFF) && (encoderCount > 0x90))
+				else if ((encoder1Count <= 0xFF) && (encoder1Count > 0x90))
 				{
 					/* Counterclockwise turn... */
-					gCommand.Rotation = -1;
+					gCommand.Encoder1_Rotation = -1;
 				}
-				encoderCount = 0;
-				cmdReadEncoder = 0;
+				encoder1Count = 0;
+				cmdReadEncoder1 = 0;
 			}
 					
 			/* Make place for the next 2 encoder bits */
-			encoderValue = (encoderValue << 2) & 0xFC;
+			encoder1Value = (encoder1Value << 2) & 0xFC;
+		}
+
+		if (cmdReadEncoder2)
+		{
+			// Get 2 new encoder bits
+			encoder2Value |= (ENCODER2_B_VALUE | ENCODER2_A_VALUE);
+			encoder2Direction = encoderStates[(encoder2Value) & 0xF];
+			
+			if (encoder2Direction == CLOCKWISE)
+			{
+				encoder2Count++;
+			}
+			else if (encoder2Direction == COUNTERCLOCKWISE)
+			{
+				encoder2Count--;
+			}
+			
+			if ((encoder2Value & 3) == 3)
+			{
+				/* Stretch valid limits for debouncing reasons */
+				if ((encoder2Count >= 0x01) && (encoder2Count < 0x70))
+				{
+					/* Clockwise turn... */
+					gCommand.Encoder2_Rotation = 2;
+				}
+				else if ((encoder2Count <= 0xFF) && (encoder2Count > 0x90))
+				{
+					/* Counterclockwise turn... */
+					gCommand.Encoder2_Rotation = -2;
+				}
+				encoder2Count = 0;
+				cmdReadEncoder2 = 0;
+			}
+			
+			/* Make place for the next 2 encoder bits */
+			encoder2Value = (encoder2Value << 2) & 0xFC;
 		}
 		
 		MIDI_Task();
