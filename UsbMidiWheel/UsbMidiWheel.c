@@ -213,12 +213,16 @@ int main(void)
 	memset((void*)&gCommand, 0, sizeof(Command_type));
 	
 	/* Configure I/O Ports */
-    DDRB |= (1<<0) | (1<<5); /* PB0 = RXLED, PB5 = Button GND */
-    PORTB = (1<<1) | (1<<2) | (1<<3) | (1<<4);
-    DDRC |= (1<<7); /* PC7 = USER_LED */
-    PORTC = (1<<0) | (1<<1) | (1<<2) | (1<<3) | (1<<4) | (1<<5) | (1<<6);
-    DDRD |= (1<<5); /* PD5 = TXLED */
-    PORTD = (1<<0) | (1<<1) | (1<<2) | (1<<3) | (1<<4) | (1<<6) | (1<<7);
+    DDRB |= RX_LED_PIN | BUTTONGND_PIN;
+    PORTB = UNUSED_SCK_PIN | ENCODER1_A_PIN | UNUSED_MISO_PIN | BUTTON4_PIN;
+    DDRC |= USER_LED_PIN;
+    PORTC = BUTTON1_PIN;
+    DDRD |= TX_LED_PIN;
+    PORTD = ENCODER2_A_PIN | ENCODER2_B_PIN | ENCODER1_SW_PIN | ENCODER1_B_PIN | ENCODER2_SW_PIN | UNUSED_IO12_PIN | BUTTON2_PIN;
+	DDRE = 0;
+	PORTE = BUTTON3_PIN;
+	DDRF = 0;
+	PORTF = UNUSED_A0_PIN | UNUSED_A1_PIN | UNUSED_A2_PIN | UNUSED_A3_PIN | UNUSED_A4_PIN | UNUSED_A5_PIN;
 	
 	/* Start Bootloader if µC is started via reset button */
 	if (MCUSR & (1 << EXTRF))

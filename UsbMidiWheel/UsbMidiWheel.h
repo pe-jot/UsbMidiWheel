@@ -19,17 +19,21 @@
 #define TIMER_PRELOAD_50MS		0xCF2C
 #define TIMER_PRELOAD_100MS		0x9E58
 
-#define LED_RX_ON		PORTB |=  (1 << PB0)
-#define LED_RX_OFF		PORTB &= ~(1 << PB0)
-#define LED_RX_TOGGLE	PORTB ^=  (1 << PB0)
-#define LED_TX_ON		PORTD |=  (1 << PD5)
-#define LED_TX_OFF		PORTD &= ~(1 << PD5)
-#define LED_TX_TOGGLE	PORTD ^=  (1 << PD5)
+#define RX_LED_PIN		(1 << PB0)
+#define RX_LED_ON		PORTB |=  LED_RX_PIN 
+#define RX_LED_OFF		PORTB &= ~LED_RX_PIN
+#define RX_LED_TOGGLE	PORTB ^=  LED_RX_PIN
+
+#define TX_LED_PIN		(1 << PD5)
+#define TX_LED_ON		PORTD |=  LED_TX_PIN
+#define TX_LED_OFF		PORTD &= ~LED_TX_PIN
+#define TX_LED_TOGGLE	PORTD ^=  LED_TX_PIN
 
 /* User LED is high-side driven */
-#define USER_LED_ON		PORTC |=  (1 << PC7)
-#define USER_LED_OFF	PORTC &= ~(1 << PC7)
-#define USER_LED_TOGGLE	PORTC ^=  (1 << PC7)
+#define USER_LED_PIN	(1 << PC7)
+#define USER_LED_ON		PORTC |=  USER_LED_PIN
+#define USER_LED_OFF	PORTC &= ~USER_LED_PIN
+#define USER_LED_TOGGLE	PORTC ^=  USER_LED_PIN
 
 /* Inputs have internal pull-up resistor enabled */
 #define ENCODER1_A_PIN				(1 << PB2)	/* MOSI */
@@ -46,6 +50,8 @@
 #define ENCODER2_SW_PIN				(1 << PD4)	/* D4 */
 #define ENCODER2_SW_PIN_PRESSED		(!(PIND & ENCODER2_SW_PIN))
 
+#define BUTTONGND_PIN				(1 << PB5)	/* D9 */
+
 #define BUTTON1_PIN					(1 << PC6)	/* D5 */
 #define BUTTON1_PRESSED				(!(PINC & BUTTON1_PIN))
 #define BUTTON2_PIN					(1 << PD7)	/* D6 */
@@ -54,6 +60,17 @@
 #define BUTTON3_PRESSED				(!(PINE & BUTTON3_PIN))
 #define BUTTON4_PIN					(1 << PB4)	/* D8 */
 #define BUTTON4_PRESSED				(!(PINB & BUTTON4_PIN))
+
+#define UNUSED_SCK_PIN				(1 << PB1)
+#define UNUSED_MISO_PIN				(1 << PB3)
+#define UNUSED_IO12_PIN				(1 << PC6)
+
+#define UNUSED_A5_PIN				(1 << PF0)
+#define UNUSED_A4_PIN				(1 << PF1)
+#define UNUSED_A3_PIN				(1 << PF4)
+#define UNUSED_A2_PIN				(1 << PF5)
+#define UNUSED_A1_PIN				(1 << PF6)
+#define UNUSED_A0_PIN				(1 << PF7)
 
 typedef enum EncoderState {
 	ENCODER_NONE = 0,
