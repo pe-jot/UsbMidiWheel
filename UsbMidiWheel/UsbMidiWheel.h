@@ -51,7 +51,6 @@
 #define ENCODER2_SW_PIN_PRESSED		(!(PIND & ENCODER2_SW_PIN))
 
 #define BUTTONGND_PIN				(1 << PB5)	/* D9 */
-
 #define BUTTON1_PIN					(1 << PC6)	/* D5 */
 #define BUTTON1_PRESSED				(!(PINC & BUTTON1_PIN))
 #define BUTTON2_PIN					(1 << PD7)	/* D6 */
@@ -64,7 +63,6 @@
 #define UNUSED_SCK_PIN				(1 << PB1)
 #define UNUSED_MISO_PIN				(1 << PB3)
 #define UNUSED_IO12_PIN				(1 << PC6)
-
 #define UNUSED_A5_PIN				(1 << PF0)
 #define UNUSED_A4_PIN				(1 << PF1)
 #define UNUSED_A3_PIN				(1 << PF4)
@@ -74,8 +72,8 @@
 
 typedef enum EncoderState {
 	ENCODER_NONE = 0,
-	ENCODER_RIGHT = 1,
-	ENCODER_LEFT = -1
+	ENCODER_CLOCKWISE = 1,
+	ENCODER_COUNTERCLOCKWISE = -1
 } EncoderState;
 	
 typedef enum PushbuttonState {

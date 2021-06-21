@@ -48,54 +48,59 @@ void MIDI_Task(void)
 	if (Endpoint_IsINReady())
 	{
 		uint8_t MIDICommand = 0;
-		uint8_t MIDIPitch;
+		uint8_t DataByte1;
+		uint8_t DataByte2 = MIDI_STANDARD_VELOCITY;
 		
 		if (gCommand.Encoder1_Button != PUSHBUTTON_NONE)
 		{
 			MIDICommand = (gCommand.Encoder1_Button == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
-			MIDIPitch = 1;
+			DataByte1 = 1;
 			gCommand.Encoder1_Button = PUSHBUTTON_NONE;
 		}
 		else if (gCommand.Encoder1_Rotation != ENCODER_NONE)
 		{
-			MIDICommand = MIDI_COMMAND_PROGRAM_CHANGE;
-			MIDIPitch = (gCommand.Encoder1_Rotation & 0x7F);
+			/* SDR Console seems to expect Control Change commands as sent by the Behringer CMD PL-1 */
+			/* Data spec. see: https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2 */
+			MIDICommand = MIDI_COMMAND_CONTROL_CHANGE;
+			DataByte1 = ENCODER1_SW_PIN_PRESSED ? 0x11 : 0x10; /* General Purpose Controller 1 + 2*/
+			DataByte2 = (gCommand.Encoder1_Rotation & 0x7F);
 			gCommand.Encoder1_Rotation = ENCODER_NONE;
 		}
 		else if (gCommand.Encoder2_Button != PUSHBUTTON_NONE)
 		{
 			MIDICommand = (gCommand.Encoder2_Button == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
-			MIDIPitch = 2;
+			DataByte1 = 2;
 			gCommand.Encoder2_Button = PUSHBUTTON_NONE;
 		}
 		else if (gCommand.Encoder2_Rotation != ENCODER_NONE)
 		{
-			MIDICommand = MIDI_COMMAND_PROGRAM_CHANGE;
-			MIDIPitch = (gCommand.Encoder2_Rotation & 0x7F);
+			MIDICommand = MIDI_COMMAND_CONTROL_CHANGE;
+			DataByte1 = ENCODER2_SW_PIN_PRESSED ? 0x13 : 0x12; /* General Purpose Controller 3 + 4 */
+			DataByte2 = (gCommand.Encoder2_Rotation & 0x7F);
 			gCommand.Encoder2_Rotation = ENCODER_NONE;
 		}
 		else if (gCommand.Button1 != PUSHBUTTON_NONE)
 		{
 			MIDICommand = (gCommand.Button1 == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
-			MIDIPitch = 11;
+			DataByte1 = 11;
 			gCommand.Button1 = PUSHBUTTON_NONE;
 		}
 		else if (gCommand.Button2 != PUSHBUTTON_NONE)
 		{
 			MIDICommand = (gCommand.Button2 == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
-			MIDIPitch = 12;
+			DataByte1 = 12;
 			gCommand.Button2 = PUSHBUTTON_NONE;
 		}
 		else if (gCommand.Button3 != PUSHBUTTON_NONE)
 		{
 			MIDICommand = (gCommand.Button3 == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
-			MIDIPitch = 13;
+			DataByte1 = 13;
 			gCommand.Button3 = PUSHBUTTON_NONE;
 		}
 		else if (gCommand.Button4 != PUSHBUTTON_NONE)
 		{
 			MIDICommand = (gCommand.Button4 == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
-			MIDIPitch = 14;
+			DataByte1 = 14;
 			gCommand.Button4 = PUSHBUTTON_NONE;
 		}
 
@@ -105,8 +110,8 @@ void MIDI_Task(void)
 			MIDI_EventPacket_t MIDIEvent = (MIDI_EventPacket_t) {
 				.Event       = MIDI_EVENT(0, MIDICommand),
 				.Data1       = MIDICommand,
-				.Data2       = MIDIPitch,
-				.Data3       = MIDI_STANDARD_VELOCITY,
+				.Data2       = DataByte1,
+				.Data3       = DataByte2,
 			};
 
 			/* Write the MIDI event packet to the endpoint */
@@ -277,12 +282,12 @@ int main(void)
 				if ((encoder1Count >= 0x01) && (encoder1Count < 0x70))
 				{
 					/* Clockwise turn... */
-					gCommand.Encoder1_Rotation = 1;
+					gCommand.Encoder1_Rotation = ENCODER_CLOCKWISE;
 				}
 				else if ((encoder1Count <= 0xFF) && (encoder1Count > 0x90))
 				{
 					/* Counterclockwise turn... */
-					gCommand.Encoder1_Rotation = -1;
+					gCommand.Encoder1_Rotation = ENCODER_COUNTERCLOCKWISE;
 				}
 				encoder1Count = 0;
 				cmdReadEncoder1 = 0;
@@ -313,12 +318,12 @@ int main(void)
 				if ((encoder2Count >= 0x01) && (encoder2Count < 0x70))
 				{
 					/* Clockwise turn... */
-					gCommand.Encoder2_Rotation = 2;
+					gCommand.Encoder2_Rotation = ENCODER_CLOCKWISE;
 				}
 				else if ((encoder2Count <= 0xFF) && (encoder2Count > 0x90))
 				{
 					/* Counterclockwise turn... */
-					gCommand.Encoder2_Rotation = -2;
+					gCommand.Encoder2_Rotation = ENCODER_COUNTERCLOCKWISE;
 				}
 				encoder2Count = 0;
 				cmdReadEncoder2 = 0;
