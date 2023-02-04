@@ -11,6 +11,7 @@ const int8_t encoderStates[] = { 0, 1, 2, 0, 2, 0, 0, 1, 1, 0, 0, 2, 0, 2, 1, 0 
 
 static volatile uint8_t cmdReadEncoder1 = 0;
 static volatile uint8_t cmdReadEncoder2 = 0;
+static volatile uint8_t cmdReadEncoder3 = 0;
 static volatile Command_type gCommand;
 
 
@@ -51,6 +52,7 @@ void MIDI_Task(void)
 		uint8_t DataByte1;
 		uint8_t DataByte2 = MIDI_STANDARD_VELOCITY;
 		
+		/* Encoder 1 */
 		if (gCommand.Encoder1_Button != PUSHBUTTON_NONE)
 		{
 			MIDICommand = (gCommand.Encoder1_Button == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
@@ -62,10 +64,12 @@ void MIDI_Task(void)
 			/* SDR Console seems to expect Control Change commands as sent by the Behringer CMD PL-1 */
 			/* Data spec. see: https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2 */
 			MIDICommand = MIDI_COMMAND_CONTROL_CHANGE;
-			DataByte1 = ENCODER1_SW_PIN_PRESSED ? 0x11 : 0x10; /* General Purpose Controller 1 + 2*/
+			DataByte1 = 0x10; /* General Purpose Controller 1 */
 			DataByte2 = (gCommand.Encoder1_Rotation & 0x7F);
 			gCommand.Encoder1_Rotation = ENCODER_NONE;
 		}
+		
+		/* Encoder 2 */
 		else if (gCommand.Encoder2_Button != PUSHBUTTON_NONE)
 		{
 			MIDICommand = (gCommand.Encoder2_Button == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
@@ -75,10 +79,27 @@ void MIDI_Task(void)
 		else if (gCommand.Encoder2_Rotation != ENCODER_NONE)
 		{
 			MIDICommand = MIDI_COMMAND_CONTROL_CHANGE;
-			DataByte1 = ENCODER2_SW_PIN_PRESSED ? 0x13 : 0x12; /* General Purpose Controller 3 + 4 */
+			DataByte1 = 0x11; /* General Purpose Controller 2 */
 			DataByte2 = (gCommand.Encoder2_Rotation & 0x7F);
 			gCommand.Encoder2_Rotation = ENCODER_NONE;
 		}
+		
+		/* Encoder 3 */
+		else if (gCommand.Encoder3_Button != PUSHBUTTON_NONE)
+		{
+			MIDICommand = (gCommand.Encoder3_Button == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
+			DataByte1 = 3;
+			gCommand.Encoder3_Button = PUSHBUTTON_NONE;
+		}
+		else if (gCommand.Encoder3_Rotation != ENCODER_NONE)
+		{
+			MIDICommand = MIDI_COMMAND_CONTROL_CHANGE;
+			DataByte1 = 0x12; /* General Purpose Controller 3 */
+			DataByte2 = (gCommand.Encoder3_Rotation & 0x7F);
+			gCommand.Encoder3_Rotation = ENCODER_NONE;
+		}
+		
+		/* Buttons */
 		else if (gCommand.Button1 != PUSHBUTTON_NONE)
 		{
 			MIDICommand = (gCommand.Button1 == PUSHBUTTON_PRESSED) ? MIDI_COMMAND_NOTE_ON : MIDI_COMMAND_NOTE_OFF;
@@ -144,7 +165,13 @@ void MIDI_Task(void)
 
 /***********************************************************************************************************************************************************************/
 
-ISR(INT0_vect)
+ISR(INT1_vect)
+{
+	cmdReadEncoder3 = 1;
+}
+
+
+ISR(INT2_vect)
 {
 	cmdReadEncoder2 = 1;
 }
@@ -179,13 +206,14 @@ inline static void ReadDebounced(volatile uint8_t* history, volatile PushbuttonS
 }
 
 
-ISR(TIMER1_OVF_vect) // 10ms Timer
+ISR(TIMER1_OVF_vect) /* 10ms Timer */
 {
 	TCNT1 = TIMER_PRELOAD_10MS;
 	uint8_t tempSREG = SREG;
 	
 	static uint8_t encoder1ButtonHistory = 0;
 	static uint8_t encoder2ButtonHistory = 0;
+	static uint8_t encoder3ButtonHistory = 0;
 	static uint8_t button1History = 0;
 	static uint8_t button2History = 0;
 	static uint8_t button3History = 0;
@@ -193,6 +221,7 @@ ISR(TIMER1_OVF_vect) // 10ms Timer
 	
 	ReadDebounced(&encoder1ButtonHistory, &(gCommand.Encoder1_Button), ENCODER1_SW_PIN_PRESSED);
 	ReadDebounced(&encoder2ButtonHistory, &(gCommand.Encoder2_Button), ENCODER2_SW_PIN_PRESSED);
+	ReadDebounced(&encoder3ButtonHistory, &(gCommand.Encoder3_Button), ENCODER3_SW_PIN_PRESSED);
 	ReadDebounced(&button1History, &(gCommand.Button1), BUTTON1_PRESSED);
 	ReadDebounced(&button2History, &(gCommand.Button2), BUTTON2_PRESSED);
 	ReadDebounced(&button3History, &(gCommand.Button3), BUTTON3_PRESSED);
@@ -214,21 +243,29 @@ int main(void)
 	uint8_t encoder2Value = 0;
 	uint8_t encoder2Count = 0;
 	uint8_t encoder2Direction = 0;
+	uint8_t encoder3Value = 0;
+	uint8_t encoder3Count = 0;
+	uint8_t encoder3Direction = 0;
 	
 	memset((void*)&gCommand, 0, sizeof(Command_type));
 	
 	/* Configure I/O Ports */
-    DDRB |= RX_LED_PIN | BUTTONGND_PIN;
-    PORTB = UNUSED_SCK_PIN | ENCODER1_A_PIN | UNUSED_MISO_PIN | BUTTON4_PIN;
+    DDRB |= RX_LED_PIN | LED3_PIN | LED2_PIN | LED1_PIN;
+    PORTB = UNUSED_SCK_PIN | UNUSED_MISO_PIN | BUTTON4_PIN | ENCODER2_SW_PIN;
+	
     DDRC |= USER_LED_PIN;
     PORTC = BUTTON1_PIN;
-    DDRD |= TX_LED_PIN;
-    PORTD = ENCODER2_A_PIN | ENCODER2_B_PIN | ENCODER1_SW_PIN | ENCODER1_B_PIN | ENCODER2_SW_PIN | UNUSED_IO12_PIN | BUTTON2_PIN;
+	
+    DDRD |= TX_LED_PIN | LED4_PIN;
+    PORTD = BUTTON2_PIN | ENCODER2_B_PIN | ENCODER1_A_PIN | ENCODER2_A_PIN | ENCODER3_A_PIN | ENCODER1_B_PIN;
+	
 	DDRE = 0;
 	PORTE = BUTTON3_PIN;
-	DDRF = 0;
-	PORTF = UNUSED_A0_PIN | UNUSED_A1_PIN | UNUSED_A2_PIN | UNUSED_A3_PIN | UNUSED_A4_PIN | UNUSED_A5_PIN;
 	
+	DDRF = LED8_PIN | LED7_PIN | LED6_PIN | LED5_PIN;
+	PORTF = ENCODER3_SW_PIN | ENCODER3_B_PIN;
+	
+	// #TODO: Enter bootloader if any HW button is being pressed during startup & switch on some HW LEDs.
 	/* Start Bootloader if µC is started via reset button */
 	if (MCUSR & (1 << EXTRF))
 	{
@@ -244,9 +281,9 @@ int main(void)
 	MCUSR &= ~(1 << WDRF);
 	wdt_disable();
 	
-	/* INT0+INT3 on any edge for encoder reading - Encoder_A creates an interrupt (B is being polled) */
-	EICRA = (1 << ISC30) | (1 << ISC00);
-	EIMSK = (1 << INT3) | (1 << INT0);
+	/* INT1, INT2, INT3 on any edge for encoder reading - Encoder_A creates an interrupt (B is being polled) */
+	EICRA = (1 << ISC30) | (1 << ISC20) | (1 << ISC10);
+	EIMSK = (1 << INT3) | (1 << INT2) | (1 << INT1);
 	
 	/* Timer1 at fosc/64 */
 	TCNT1 = TIMER_PRELOAD_10MS;
@@ -263,7 +300,7 @@ int main(void)
     {
 		if (cmdReadEncoder1)
 		{
-			// Get 2 new encoder bits
+			/* Get 2 new encoder bits */
 			encoder1Value |= (ENCODER1_B_VALUE | ENCODER1_A_VALUE);
 			encoder1Direction = encoderStates[(encoder1Value) & 0xF];
 					
@@ -299,7 +336,7 @@ int main(void)
 
 		if (cmdReadEncoder2)
 		{
-			// Get 2 new encoder bits
+			/* Get 2 new encoder bits */
 			encoder2Value |= (ENCODER2_B_VALUE | ENCODER2_A_VALUE);
 			encoder2Direction = encoderStates[(encoder2Value) & 0xF];
 			
@@ -331,6 +368,52 @@ int main(void)
 			
 			/* Make place for the next 2 encoder bits */
 			encoder2Value = (encoder2Value << 2) & 0xFC;
+		}
+
+		if (cmdReadEncoder3)
+		{
+			/* Get 2 new encoder bits */
+			encoder3Value |= (ENCODER3_B_VALUE | ENCODER3_A_VALUE);
+			encoder3Direction = encoderStates[(encoder3Value) & 0xF];
+		
+			if (encoder3Direction == CLOCKWISE)
+			{
+				encoder3Count++;
+			}
+			else if (encoder3Direction == COUNTERCLOCKWISE)
+			{
+				encoder3Count--;
+			}
+		
+			if ((encoder3Value & 3) == 3)
+			{
+				/* Stretch valid limits for debouncing reasons */
+				if ((encoder3Count >= 0x01) && (encoder3Count < 0x70))
+				{
+					/* Clockwise turn... */
+					gCommand.Encoder3_Rotation = ENCODER_CLOCKWISE;
+				}
+				else if ((encoder3Count <= 0xFF) && (encoder3Count > 0x90))
+				{
+					/* Counterclockwise turn... */
+					gCommand.Encoder3_Rotation = ENCODER_COUNTERCLOCKWISE;
+				}
+				encoder3Count = 0;
+				cmdReadEncoder3 = 0;
+			}
+		
+			/* Make place for the next 2 encoder bits */
+			encoder3Value = (encoder3Value << 2) & 0xFC;
+		}
+		
+		/* PTT - operate ON-AIR LED */
+		if (gCommand.Button4 == PUSHBUTTON_PRESSED)
+		{
+			LED4_ON;
+		}
+		else
+		{
+			LED4_OFF;
 		}
 		
 		MIDI_Task();
