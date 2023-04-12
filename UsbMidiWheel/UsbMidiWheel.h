@@ -20,12 +20,12 @@
 #define TIMER_PRELOAD_100MS		0x9E58
 
 #define RX_LED_PIN		(1 << PB0)
-#define RX_LED_ON		PORTB |=  LED_RX_PIN 
-#define RX_LED_OFF		PORTB &= ~LED_RX_PIN
+#define RX_LED_ON		PORTB |=  RX_LED_PIN 
+#define RX_LED_OFF		PORTB &= ~RX_LED_PIN
 
 #define TX_LED_PIN		(1 << PD5)
-#define TX_LED_ON		PORTD |=  LED_TX_PIN
-#define TX_LED_OFF		PORTD &= ~LED_TX_PIN
+#define TX_LED_ON		PORTD |=  TX_LED_PIN
+#define TX_LED_OFF		PORTD &= ~TX_LED_PIN
 
 /* User LED is high-side driven */
 #define USER_LED_PIN	(1 << PC7)	/* 13 */

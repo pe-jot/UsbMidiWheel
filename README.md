@@ -16,8 +16,6 @@ The software is a "native" application, means it works without the Arduino softw
 Thus, the Atmel DFU Bootloader is in use instead of the Arduino bootloader.
 USB functionality is handled by LUFA library by Dean Camera (https://www.lufa-lib.org).
 
-
-
 #### Setup
 
 1. Build project with Atmel Studio 7.0
@@ -28,3 +26,7 @@ USB functionality is handled by LUFA library by Dean Camera (https://www.lufa-li
 5. Flash bootloader hex file
 6. Clear the BOOTRST fuse
 7. Flash application binaries using the DFU bootloader
+
+#### Bootloader
+
+The bootloader is started when the µC is being reset via the reset button.
